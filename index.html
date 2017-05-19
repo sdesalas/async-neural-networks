@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<style>
+			body {
+				background-color: #333;
+				margin: 0;
+				overflow: hidden;
+			}
+		</style>
+	</head>
+	<body>
+		<script src="http://cdnjs.cloudflare.com/ajax/libs/three.js/84/three.min.js"></script>
+		<script src="https://rawgit.com/mrdoob/three.js/dev/examples/js/controls/OrbitControls.js"></script>
+		<script src="https://rawgit.com/mrdoob/three.js/dev/examples/js/controls/TrackballControls.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/EventEmitter/5.1.0/EventEmitter.min.js"></script>
+		<script src="https://rawgit.com/sdesalas/fusspot/master/NeuralNetwork.js"></script>
+		<script> 
+
+			//console.log('EventEmitter', EventEmitter);
+			//console.log('NeuralNetwork', fusspot.NeuralNetwork);
+			//console.log('Random', fusspot.Random)
+			
+			let NeuralNetwork = fusspot.NeuralNetwork; 
+			let Random = fusspot.Random;
+			
+			let network, spheres;
+			let camera, scene, renderer, control;
+			let geometry, material, mesh;
+
+			function init() {
+				
+				network = new NeuralNetwork(30, 'snake');
+
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 10000 );
+				camera.position.z = network.nodes.length * 5;
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0x333333 );
+
+				spheres = network.nodes.map((node, i, arr) => {
+					let sphere = new THREE.Mesh(
+						new THREE.SphereGeometry( 1 ), 
+						new THREE.MeshBasicMaterial( { color: 0xdddddd } )
+						// new THREE.MeshBasicMaterial( { color: 0x666666, wireframe: true } ) 											   
+					)
+					sphere.position.x = arr.length / 2 - Random.integer(arr.length);
+					sphere.position.y = arr.length / 2 - Random.integer(arr.length);
+					sphere.position.z = arr.length / 2 - Random.integer(arr.length);
+					scene.add(sphere);
+					return sphere;
+				});
+				
+				network.nodes.forEach((node, i) => {
+					let { x, y, z } = spheres[i].position;
+					let origin = new THREE.Vector3(x, y, z);
+					node.synapses.filter(s => s.t).forEach(synapse => {
+						let { x, y, z } = spheres[synapse.i].position;
+						path = new THREE.Geometry();
+						path.vertices.push(origin);
+						path.vertices.push(new THREE.Vector3(x,y,z));
+						scene.add(new THREE.Line(
+							path,
+							new THREE.LineDashedMaterial({ color: 0x555555, gapSize: 3 }) 
+						));
+					});
+				});
+				
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				
+				//controls = new THREE.TrackballControls( camera, renderer.domElement );
+				controls = new THREE.OrbitControls( camera, renderer.domElement );
+				
+				document.body.appendChild( renderer.domElement );				
+				
+				bounce()
+			}
+
+			function animate( time ) {
+
+				//mesh.rotation.x = time * 0.0005;
+				//mesh.rotation.y = time * 0.001;
+
+				//controls.update();
+				
+				renderer.render( scene, camera );
+				requestAnimationFrame( animate );
+
+			}
+			
+			function bounce() {
+				let count = network.synapses.length;
+				
+				let total = network.nodes.reduce((acc, neuron, i) => {
+					let origin = spheres[i].position;
+					let n = neuron.synapses.length;
+					while(n--) {
+						let target = neuron.synapses[n].t;
+						if (target) {
+							acc += origin.distanceTo(spheres[target.id].position);
+						}
+					}
+					return acc;
+				}, 0);
+				let average = total / count;
+				
+				console.log('average', total, count, average);
+				    /*
+				network.nodes.forEach((neuron, i) => {
+					let origin = spheres[i].position;
+					let n = neuron && neuron.synapses.length;
+					while(n--) {
+						let t = neuron.synapses[n].t;
+						let targetSphere = t && spheres[t.id];
+						if (targetSphere) {
+							let target = targetSphere.position;
+							let distance = origin.distanceTo(target);
+							let diff = target.clone().sub(origin);
+							let speed = (average - distance) / average / 2;
+							let final = diff.clone().multiplyScalar(speed, speed, speed);
+							console.log('target', {id: t.id, origin, target, distance, average, speed, final});
+							let { x, y, z } = diff;
+							console.log('diff', { x, y, z });
+							//let distance = origin.distanceTo(target);
+							//let diff = distance - average;
+							//console.log(i, t.id, distance, diff);
+							//target.position = origin.multiplyScalar();
+						}
+					};
+				});*/
+			}
+
+			init();
+			requestAnimationFrame( animate );
+			
+		</script>
+	</body>
+</html>
