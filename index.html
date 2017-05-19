@@ -31,7 +31,7 @@
 
 			function init() {
 				
-				network = new NeuralNetwork(30, 'snake');
+				network = new NeuralNetwork(60, 'snake');
 
 				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 10000 );
 				camera.position.z = network.nodes.length * 5;
