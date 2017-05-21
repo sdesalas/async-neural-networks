@@ -31,10 +31,10 @@
 
 			function init() {
 				
-				network = new NeuralNetwork(30, 'snake');
+				network = new NeuralNetwork(60);
 
 				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 10000 );
-				camera.position.z = network.nodes.length * 5;
+				camera.position.z = network.nodes.length * 1.5;
 
 				scene = new THREE.Scene();
 				scene.background = new THREE.Color( 0x333333 );
