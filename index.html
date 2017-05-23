@@ -25,16 +25,17 @@
 			let NeuralNetwork = fusspot.NeuralNetwork; 
 			let Random = fusspot.Random;
 			
-			let network, spheres;
-			let camera, scene, renderer, control;
+			let network, spheres, lines;
+			let camera, scene, renderer, control, clock;
 			let geometry, material, mesh;
 
 			function init() {
 				
-				network = new NeuralNetwork(60);
+				network = new NeuralNetwork(20);
 
+				clock = new THREE.Clock();
 				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 10000 );
-				camera.position.z = network.nodes.length * 1.5;
+				camera.position.z = network.nodes.length * 1.9;
 
 				scene = new THREE.Scene();
 				scene.background = new THREE.Color( 0x333333 );
@@ -48,24 +49,12 @@
 					sphere.position.x = arr.length / 2 - Random.integer(arr.length);
 					sphere.position.y = arr.length / 2 - Random.integer(arr.length);
 					sphere.position.z = arr.length / 2 - Random.integer(arr.length);
+					node.sphere = sphere;
 					scene.add(sphere);
 					return sphere;
 				});
 				
-				network.nodes.forEach((node, i) => {
-					let { x, y, z } = spheres[i].position;
-					let origin = new THREE.Vector3(x, y, z);
-					node.synapses.filter(s => s.t).forEach(synapse => {
-						let { x, y, z } = spheres[synapse.i].position;
-						path = new THREE.Geometry();
-						path.vertices.push(origin);
-						path.vertices.push(new THREE.Vector3(x,y,z));
-						scene.add(new THREE.Line(
-							path,
-							new THREE.LineDashedMaterial({ color: 0x555555, gapSize: 3 }) 
-						));
-					});
-				});
+				lines = drawSynapses();
 				
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
 				renderer.setSize( window.innerWidth, window.innerHeight );
@@ -75,7 +64,9 @@
 				
 				document.body.appendChild( renderer.domElement );				
 				
-				bounce()
+				bounce();
+				
+				moveSynapses();
 			}
 
 			function animate( time ) {
@@ -83,53 +74,77 @@
 				//mesh.rotation.x = time * 0.0005;
 				//mesh.rotation.y = time * 0.001;
 
-				//controls.update();
+				controls.update( clock.getDelta() );
+				bounce();
+				moveSynapses();
 				
 				renderer.render( scene, camera );
 				requestAnimationFrame( animate );
+				
 
 			}
 			
+			function drawSynapses() {
+				let material = new THREE.LineDashedMaterial({ color: 0x555555, gapSize: 3 }) ;
+				return network.nodes.reduce((acc, node, i) => {
+					let { x, y, z } = spheres[i].position;
+					let origin = new THREE.Vector3(x, y, z);
+					return acc.concat(node.synapses.filter(s => s.t).map(synapse => {
+						let { x, y, z } = spheres[synapse.i].position;
+						path = new THREE.Geometry();
+						path.vertices.push(origin);
+						path.vertices.push(new THREE.Vector3(x,y,z));
+						let line = new THREE.Line(
+							path,
+							material
+						);
+						line.source = spheres[i];
+						line.target = spheres[synapse.i];
+						scene.add(line);
+						return line;
+					}));;
+				}, []);
+
+			}
+			
+			function moveSynapses() {
+				lines.forEach(line => {
+					console.log(line);
+					line.geometry.vertices[0] = line.source.position.clone();
+					line.geometry.vertices[1] = line.target.position.clone();
+					line.geometry.verticesNeedUpdate = true;
+				});
+			}
+			
 			function bounce() {
-				let count = network.synapses.length;
-				
-				let total = network.nodes.reduce((acc, neuron, i) => {
-					let origin = spheres[i].position;
-					let n = neuron.synapses.length;
-					while(n--) {
-						let target = neuron.synapses[n].t;
-						if (target) {
-							acc += origin.distanceTo(spheres[target.id].position);
-						}
-					}
-					return acc;
-				}, 0);
-				let average = total / count;
-				
-				console.log('average', total, count, average);
-				    /*
+
+				let average = network.size / 2;
+				    
 				network.nodes.forEach((neuron, i) => {
 					let origin = spheres[i].position;
 					let n = neuron && neuron.synapses.length;
 					while(n--) {
 						let t = neuron.synapses[n].t;
-						let targetSphere = t && spheres[t.id];
-						if (targetSphere) {
-							let target = targetSphere.position;
+						let sphere = t && spheres[t.id];
+						if (sphere) {
+							let target = sphere.position;
 							let distance = origin.distanceTo(target);
-							let diff = target.clone().sub(origin);
-							let speed = (average - distance) / average / 2;
-							let final = diff.clone().multiplyScalar(speed, speed, speed);
-							console.log('target', {id: t.id, origin, target, distance, average, speed, final});
-							let { x, y, z } = diff;
-							console.log('diff', { x, y, z });
-							//let distance = origin.distanceTo(target);
-							//let diff = distance - average;
-							//console.log(i, t.id, distance, diff);
-							//target.position = origin.multiplyScalar();
+							let diff = distance - average;
+							let multiplier = ((diff * 0.995) + average) / distance;
+							let vecDiff = target.clone().sub(origin);
+							let vecDiffMultiplied = vecDiff.clone().multiplyScalar(multiplier, multiplier, multiplier);
+							let vecFinal = origin.clone().add(vecDiffMultiplied);
+							let { x, y, z } = vecFinal;
+							target.x = x;
+							target.y = y;
+							target.z = z;
+							let vecFinal2 = target.clone().sub(vecDiffMultiplied);
+							origin.x = vecFinal2.x;
+							origin.y = vecFinal2.y;
+							origin.z = vecFinal2.z;
 						}
 					};
-				});*/
+				});
 			}
 
 			init();
