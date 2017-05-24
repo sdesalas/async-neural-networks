@@ -11,144 +11,23 @@
 		</style>
 	</head>
 	<body>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/84/three.min.js"></script>
-		<script src="https://rawgit.com/mrdoob/three.js/dev/examples/js/controls/OrbitControls.js"></script>
-		<script src="https://rawgit.com/mrdoob/three.js/dev/examples/js/controls/TrackballControls.js"></script>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/EventEmitter/5.1.0/EventEmitter.min.js"></script>
-		<script src="https://rawgit.com/sdesalas/fusspot/master/NeuralNetwork.js"></script>
+		<script src="//unpkg.com/3d-force-graph@1.3/dist/3d-force-graph.min.js"></script>
+		<script src="//cdnjs.cloudflare.com/ajax/libs/qwest/4.4.5/qwest.min.js"></script>
+		<script src="//cdnjs.cloudflare.com/ajax/libs/EventEmitter/5.1.0/EventEmitter.min.js"></script>
+		<script src="//rawgit.com/sdesalas/fusspot/master/NeuralNetwork.js"></script>
 		<script> 
 
-			//console.log('EventEmitter', EventEmitter);
-			//console.log('NeuralNetwork', fusspot.NeuralNetwork);
-			//console.log('Random', fusspot.Random)
+			let network = new fusspot.NeuralNetwork(340, 'donught');
+			let nodes = network.nodes.map(node => ({ id: node.id }));
+			let links = network.nodes.reduce((acc, n, i, arr) => acc.concat(n.synapses.filter(s => s.t).map(s => ({ source: n.id, target: s.t.id }))), []);
 			
-			let NeuralNetwork = fusspot.NeuralNetwork; 
-			let Random = fusspot.Random;
+			const Graph = ForceGraph3D()(document.body);
 			
-			let network, spheres, lines;
-			let camera, scene, renderer, control, clock;
-			let geometry, material, mesh;
-
-			function init() {
-				
-				network = new NeuralNetwork(40);
-
-				clock = new THREE.Clock();
-				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 10000 );
-				camera.position.z = network.nodes.length * 1.9;
-
-				scene = new THREE.Scene();
-				scene.background = new THREE.Color( 0x333333 );
-
-				spheres = network.nodes.map((node, i, arr) => {
-					let sphere = new THREE.Mesh(
-						new THREE.SphereGeometry( 1 ), 
-						new THREE.MeshBasicMaterial( { color: 0xdddddd } )
-						// new THREE.MeshBasicMaterial( { color: 0x666666, wireframe: true } ) 											   
-					)
-					sphere.position.x = arr.length / 2 - Random.integer(arr.length);
-					sphere.position.y = arr.length / 2 - Random.integer(arr.length);
-					sphere.position.z = arr.length / 2 - Random.integer(arr.length);
-					node.sphere = sphere;
-					scene.add(sphere);
-					return sphere;
-				});
-				
-				lines = drawSynapses();
-				
-				renderer = new THREE.WebGLRenderer( { antialias: true } );
-				renderer.setSize( window.innerWidth, window.innerHeight );
-				
-				//controls = new THREE.TrackballControls( camera, renderer.domElement );
-				controls = new THREE.OrbitControls( camera, renderer.domElement );
-				
-				document.body.appendChild( renderer.domElement );				
-				
-				bounce();
-				
-				moveSynapses();
-			}
-
-			function animate( time ) {
-
-				//mesh.rotation.x = time * 0.0005;
-				//mesh.rotation.y = time * 0.001;
-
-				controls.update( clock.getDelta() );
-				bounce();
-				moveSynapses();
-				
-				renderer.render( scene, camera );
-				requestAnimationFrame( animate );
-				
-
-			}
-			
-			function drawSynapses() {
-				let material = new THREE.LineDashedMaterial({ color: 0x555555, gapSize: 3 }) ;
-				return network.nodes.reduce((acc, node, i) => {
-					let { x, y, z } = spheres[i].position;
-					let origin = new THREE.Vector3(x, y, z);
-					return acc.concat(node.synapses.filter(s => s.t).map(synapse => {
-						let { x, y, z } = spheres[synapse.i].position;
-						path = new THREE.Geometry();
-						path.vertices.push(origin);
-						path.vertices.push(new THREE.Vector3(x,y,z));
-						let line = new THREE.Line(
-							path,
-							material
-						);
-						line.source = spheres[i];
-						line.target = spheres[synapse.i];
-						scene.add(line);
-						return line;
-					}));;
-				}, []);
-
-			}
-			
-			function moveSynapses() {
-				lines.forEach(line => {
-					console.log(line);
-					line.geometry.vertices[0] = line.source.position.clone();
-					line.geometry.vertices[1] = line.target.position.clone();
-					line.geometry.verticesNeedUpdate = true;
-				});
-			}
-			
-			function bounce() {
-
-				let average = network.size / 2;
-				    
-				network.nodes.forEach((neuron, i) => {
-					let origin = spheres[i].position;
-					let n = neuron && neuron.synapses.length;
-					while(n--) {
-						let t = neuron.synapses[n].t;
-						let sphere = t && spheres[t.id];
-						if (sphere) {
-							let target = sphere.position;
-							let distance = origin.distanceTo(target);
-							let diff = distance - average;
-							let multiplier = ((diff * 0.995) + average) / distance;
-							let vecDiff = target.clone().sub(origin);
-							let vecDiffMultiplied = vecDiff.clone().multiplyScalar(multiplier, multiplier, multiplier);
-							let vecFinal = origin.clone().add(vecDiffMultiplied);
-							let { x, y, z } = vecFinal;
-							target.x = x;
-							target.y = y;
-							target.z = z;
-							let vecFinal2 = target.clone().sub(vecDiffMultiplied);
-							origin.x = vecFinal2.x;
-							origin.y = vecFinal2.y;
-							origin.z = vecFinal2.z;
-						}
-					};
-				});
-			}
-
-			init();
-			requestAnimationFrame( animate );
+			Graph 
+				.warmupTicks(20)
+				.cooldownTicks(150)
+            	.forceEngine('ngraph')
+            	.graphData({ nodes: nodes, links: links });
 			
 		</script>
 	</body>
