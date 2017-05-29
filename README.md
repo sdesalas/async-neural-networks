@@ -1,6 +1,6 @@
 # 3D Ansync Neural Networks
 
-I am finding that asynchronous neural networks, unlike their traditional counterparts, rely on the shape of the network to produce oscillations (or "brainwaves") that are essentially a residual travelling signal being repeated through the network.
+I am observing that asynchronous neural networks can rely on the shape of the network to produce oscillations (or "brainwaves") that are essentially a residual travelling signal being repeated through the network.
 
 Here are some experiements to visualise networks in 3D using WebGL and THREE.js. I havent included the firing patterns yet but will when I get a moment.
 
